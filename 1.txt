@@ -1,0 +1,440 @@
+index - -------------------
+
+@model RespuestaApi
+
+<h1>Lista de productos</h1>
+
+
+<table class="table">
+    <thead class="thead-dark">
+        <tr>
+            <th>ID</th>
+            <th>Producto</th>
+            <th>Fecha de registro</th>
+            <th>Precio Compra</th>
+            <th>Precio Ventas</th>
+            <th>Existencias</th>
+            
+        </tr>
+        </thead>
+
+    <tbody>
+        @foreach(var Productos in Model.Datos)
+        {
+           <tr>
+                <td scope="row">@Productos.Id</td>
+                <td scope="row">@Productos.producto</td>
+                <td scope="row">@Productos.fechaRegistro</td>
+                <td scope="row">@Productos.precioCompra</td>
+                <td scope="row">@Productos.PrecioVenta</td>
+                <td scope="row">@Productos.Existencias</td>
+               
+
+                </tr>
+        }
+        </tbody>
+    </table>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+------------------------
+using Microsoft.AspNetCore.Mvc;
+using System.Diagnostics;
+using System.Text.Json.Serialization;
+using vista_cliente.Models;
+using Newtonsoft.Json;
+using System.Text;
+
+
+namespace vista_cliente.Controllers
+{
+    public class HomeController : Controller
+    {
+        private readonly HttpClient _httpClient;
+
+        public HomeController(IHttpClientFactory httpClientFactory)
+        {
+            _httpClient = httpClientFactory.CreateClient("RestFullAPIBiblioteca");
+        }
+
+        public async Task<IActionResult> Index(int? page)
+        {
+            int pageNumber = page ?? 1;
+            int pageSize = 5;
+
+
+            var respons = await _httpClient.GetAsync("/api/v1/Libro");
+            if (respons.IsSuccessStatusCode)
+            {
+
+                var json = await respons.Content.ReadAsStringAsync();
+                var libros = JsonConvert.DeserializeObject<RespuestaApi>(json);
+                int totalRegistros = libros.Datos.Count;
+
+
+                var response = await _httpClient.GetAsync($"/api/v1/Libro?NumeroPagina={pageNumber}&TamanioPagina={pageSize}");
+                if (response.IsSuccessStatusCode)
+                {
+
+
+
+                    var jsn = await response.Content.ReadAsStringAsync();
+                    var data = JsonConvert.DeserializeObject<RespuestaApi>(jsn);
+
+                    data.Total = totalRegistros;
+                    return View(data);
+                } 
+
+
+
+               
+
+            }
+
+
+            return View();
+
+        }
+    
+
+
+       public IActionResult Agregar()
+        {
+            return View();
+        }
+        [HttpPost]
+
+        public async Task<IActionResult> Crear(Libro libro)
+        {
+            if (ModelState.IsValid)
+            {
+                var json = JsonConvert.SerializeObject(libro);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+                var response = await _httpClient.PostAsync("https://localhost:44356/api/v1/Libro", content);
+                response.EnsureSuccessStatusCode();
+                return RedirectToAction(nameof(Index));
+
+            }
+            return View(libro);
+        }
+
+
+        [HttpGet]
+
+        public async Task<IActionResult> Modificar(int id)
+        {
+            var response = await _httpClient.GetAsync($"/api/v1/libro/{id}");
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                var libroGet = JsonConvert.DeserializeObject<LibroGet>(json);
+                var libro = new Libro
+                {
+                    Id = libroGet.Datos.Id,
+                    TituloLibro = libroGet.Datos.TituloLibro,
+                    CantidadPaginas = libroGet.Datos.CantidadPaginas,
+                    Editorial = libroGet.Datos.Editorial,
+                    cantidad = libroGet.Datos.cantidad
+
+                };
+
+                return View(libro);
+            }
+            return View();
+        }
+        [HttpPost]
+
+        public async Task<IActionResult> Actualizar(Libro libro)
+        {
+            if (ModelState.IsValid)
+            {
+                var json = JsonConvert.SerializeObject(libro);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+                var response = await _httpClient.PutAsync($"https://localhost:44356/api/v1/Libro/{libro.Id}", content);
+                response.EnsureSuccessStatusCode();
+                return RedirectToAction(nameof(Index));
+            }
+
+            return View(libro);
+        }
+        public async Task<IActionResult> Eliminar(int id)
+        {
+            var response = await _httpClient.DeleteAsync($"/api/v1/Libro/{id}");
+            response.EnsureSuccessStatusCode();
+            return RedirectToAction(nameof(Index));
+        }
+    }
+}
+
+
+
+      
+
+      -----------------------------------
+
+
+      vistas index
+@model RespuestaApi
+
+<h1>Lista de Libros</h1>
+
+<h1>Marvin Galeano</h1>
+
+<table class="table table-success table-striped">
+    <thead class="thead-dark">
+        <tr>
+            <th>ID</th>
+            <th>Titulo</th>
+            <th>Cantidad de Paginas</th>
+             <th>Editorial</th>
+            <th>Cantidad</th>
+            <th>Opciones</th>
+            </tr>
+            </thead>
+    <tbody>
+        @foreach (var libros in Model.Datos)
+        {
+            
+            <tr>
+                <td scope="row">@libros.Id</td>
+                <td>@libros.TituloLibro</td>
+                <td>@libros.CantidadPaginas</td>
+                <td>@libros.Editorial</td>
+                <td>@libros.cantidad</td>
+
+
+                <td>
+
+                    <a class="btn btn-success" asp-controller="Home" asp-action="Modificar" asp-route-id="@libros.Id">Actualizar</a>
+
+                    <a class="btn btn-danger" asp-controller="Home" asp-action="Eliminar" asp-route-id="@libros.Id">Eliminar</a>
+
+                </td>
+                </tr>
+
+
+        }
+
+        <div>
+            @*boton anterior*@
+            @if (Model.NumeroPagina > 1)
+            {
+                <a href="@Url.Action("Index","Home", new {page = Model.NumeroPagina - 1})">
+                    Anterior</a>
+            }
+            @for (int i = 1; i <= Math.Ceiling((double) Model.Total / Model.TamanioPagina); i++)
+            {
+                if( i == Model.NumeroPagina)
+                {
+                    <strong>@i</strong>
+
+                }
+                else
+                {
+                    <a href="@Url.Action("Index","Home", new {page = i})">@i</a>
+                }
+            }
+            @*boton siguiente*@
+            @if (Model.NumeroPagina< Math.Ceiling((double) Model.Total / Model.TamanioPagina))
+            {
+     <a href="@Url.Action("Index","Home", new {page = Model.NumeroPagina + 1})">Siguiente</a>
+            }
+            </div>
+
+
+
+        
+                </tbody>
+
+      </table>
+
+
+      agregar ----------------------------------------
+      @model Libro
+
+    <h1>Agregar Libro</h1>
+    <h1>Marvin Galeano</h1>
+
+    <form asp-action="Crear">
+        <div class="form-group">
+            <label asp-for="TituloLibro">
+                Titulo del libro:</label> <br>
+
+            <input asp-for="TituloLibro" class="form-control" type="text" required>
+                </div>
+
+        <div class="form-group">
+            <label asp-for="CantidadPaginas">
+                Cantidad de Paginas:
+            </label> <br>
+        <input asp-for="CantidadPaginas" class="form-control" type="number" required>
+                </div>
+
+        <div class="form-group">
+            <label asp-for="Editorial">
+                Editorial:
+            </label> <br>
+        <input asp-for="Editorial" class="form-control" type="text" required>
+        </div>
+
+        <div class="form-group">
+            <label asp-for="cantidad">
+                Cantidad:
+            </label> <br>
+        <input asp-for="cantidad" class="form-control" type="number" required>
+        </div>
+        <br>
+             <input type="submit" class="btn btn-primary" value="Guardar Libro">
+        </form>
+
+
+        modificar -------------------------------------
+
+        @model Libro
+
+    <h1>Modificar Libro</h1>
+    <h1>Marvin Galeano</h1>
+
+    <form asp-action="Actualizar" method="post">
+    <input type="hidden" asp-for="Id"/> 
+
+
+        <div class="form-group">
+            <label asp-for="TituloLibro">Titulo del libro:</label> <br>
+            <input asp-for="TituloLibro" class="form-control" type="text" required>
+            <span asp-validation-for="TituloLibro" class="text-danger"></span>
+                </div>
+
+        <div class="form-group">
+            <label asp-for="CantidadPaginas">
+                Cantidad de Paginas:
+            </label> <br>
+
+            <input asp-for="CantidadPaginas" class="form-control" type="number" required>
+            <span asp-validation-for="CantidadPaginas" class="text-danger"></span>
+                </div>
+              
+
+
+        <div class="form-group">
+            <label asp-for="Editorial">
+                Editorial:
+            </label> <br>
+            <input asp-for="Editorial" class="form-control" type="text" required>
+            <span asp-validation-for="Editorial" class="text-danger"></span>
+        </div>
+
+        <div class="form-group">
+            <label asp-for="cantidad">
+                Cantidad:
+            </label> <br>
+            <input asp-for="cantidad" class="form-control" type="number" required>
+            <span asp-validation-for="cantidad" class="text-danger"></span>
+        </div>
+
+
+        <br>
+             <input type="submit" class="btn btn-primary" value="Guardar Cambios">
+    
+        </form>
+<img src="~/css/jj.jpg" />
+
+
+
+
+
+
+
+
+
+productos get ------------------------------
+namespace vista_cliente.Models
+{
+    public class LibroGet
+    {
+        public bool Confirmar { get; set; }
+
+        public string  Mensaje { get; set; }
+
+
+        public object Errors { get; set; }
+        public Libro Datos { get; set; }
+    }
+
+    public class LibroDatos
+    {
+       public int Id { get; set; }
+        public string TituloLibro { get; set; }
+        public int CantidadPaginas { get; set; }
+        public string Editorial { get; set; }
+        public int cantidad { get; set; }
+    }
+}
+
+
+program ------------------------------
+builder.Services.AddHttpClient("2Caso -Marvin - William", c =>
+{
+    c.BaseAddress = new Uri("https://localhost:44356/api/v1/Producto");
+    c.DefaultRequestHeaders.Add("Accept", "application/json");
+});
+
+
+
+
+homecontroller normal------------------------------------------------------
+using Microsoft.AspNetCore.Mvc;
+using Newtonsoft.Json;
+using parcial2.Models;
+using System.Diagnostics;
+
+namespace parcial2.Controllers
+{
+    public class HomeController : Controller
+    {
+        private readonly HttpClient _httpClient;
+
+        public HomeController(IHttpClientFactory httpClientFactory)
+        {
+            _httpClient = httpClientFactory.CreateClient("2Caso -Marvin - William");
+
+        }
+
+        public async Task<IActionResult> Index()
+        {
+            var response = await _httpClient.GetAsync("/api/v1/Producto");
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                var data = JsonConvert.DeserializeObject<RespuestaApi>(json);
+
+                // Verificar si la propiedad "Datos" dentro de "RespuestaApi" no es nula
+                if (data != null && data.Datos != null)
+                {
+                    return View(data);
+                }
+            }
+
+            // Inicializar el objeto "Model" si es nulo
+            var emptyData = new RespuestaApi { Datos = new List<Productos>() };
+            return View(emptyData);
+        }
+
+    }
+}
+
